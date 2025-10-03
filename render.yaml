@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: katsina-msme-clinic-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        value: mongodb+srv://admin:admin123@cluster0.kcdootf.mongodb.net/msme_clinic?retryWrites=true&w=majority&appName=Cluster0
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        value: kasedakatsinastate@gmail.com
+      - key: SMTP_PASS
+        value: iekk xmim ueed gvpr
+      - key: FROM_EMAIL
+        value: kasedakatsinastate@gmail.com
+      - key: FROM_NAME
+        value: Katsina State National MSME Clinic
+      - key: JWT_SECRET
+        value: your_jwt_secret_key_here_production
+      - key: JWT_REFRESH_SECRET
+        value: your_refresh_secret_key_here_production
+      - key: PORT
+        value: 10000
+      - key: CORS_ORIGIN
+        value: https://your-frontend-domain.com
