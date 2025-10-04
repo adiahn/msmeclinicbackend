@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
 const cloudEmailService = require('./cloudEmailService');
+const renderEmailService = require('./renderEmailService');
 
 class EmailService {
   constructor() {
@@ -72,9 +73,20 @@ class EmailService {
 
   async sendEmail(to, subject, html, text = null, retries = 3) {
     try {
+      // For production (Render), try render email service first
+      if (process.env.NODE_ENV === 'production') {
+        logger.info('Using render email service for production');
+        const renderResult = await renderEmailService.sendEmail(to, subject, html, text);
+        if (renderResult.success) {
+          return renderResult;
+        }
+        logger.warn('Render email service failed, trying cloud email service');
+        return await cloudEmailService.sendEmail(to, subject, html, text);
+      }
+
+      // For development, use standard email service
       if (!this.transporter) {
         logger.warn('Email service not available - trying cloud email service');
-        // Try cloud email service as fallback
         return await cloudEmailService.sendEmail(to, subject, html, text);
       }
 
@@ -100,7 +112,6 @@ class EmailService {
           
           if (attempt === retries) {
             logger.error('All email send attempts failed, trying cloud email service:', error);
-            // Try cloud email service as fallback
             return await cloudEmailService.sendEmail(to, subject, html, text);
           }
           
@@ -112,7 +123,6 @@ class EmailService {
       }
     } catch (error) {
       logger.error('Failed to send email, trying cloud email service:', error);
-      // Try cloud email service as fallback
       return await cloudEmailService.sendEmail(to, subject, html, text);
     }
   }

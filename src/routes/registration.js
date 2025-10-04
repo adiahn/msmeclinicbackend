@@ -4,6 +4,7 @@ const Registration = require('../database/models/Registration');
 const { registrationSchema, emailConfirmationSchema, validate } = require('../utils/validation');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const emailService = require('../utils/emailService');
+const emailQueue = require('../utils/emailQueue');
 const logger = require('../utils/logger');
 const timeout = require('../middleware/timeout');
 
@@ -51,40 +52,38 @@ router.post('/',
         }
       });
 
-      // Send emails asynchronously (non-blocking)
+      // Send emails using queue system (non-blocking)
       setImmediate(async () => {
-        logger.info(`Starting email sending process for ${registration.email}`);
+        logger.info(`Queuing emails for ${registration.email}`);
         
-        // Check if email service is available
-        if (!emailService.transporter) {
-          logger.error('Email service not available - cannot send emails');
-          return;
+        try {
+          // Queue confirmation email
+          const confirmationHtml = emailService.getRegistrationConfirmationTemplate(registration);
+          await emailQueue.addEmail(
+            registration.email,
+            'Registration Confirmation - Katsina State National MSME Clinic',
+            confirmationHtml,
+            null,
+            'high'
+          );
+          logger.info(`Confirmation email queued for ${registration.email}`);
+        } catch (error) {
+          logger.error('Failed to queue confirmation email:', error);
         }
 
         try {
-          logger.info(`Sending confirmation email to ${registration.email}`);
-          const emailResult = await emailService.sendRegistrationConfirmation(registration);
-          
-          if (emailResult.success) {
-            logger.info(`Registration confirmation email sent successfully to ${registration.email}`);
-          } else {
-            logger.error(`Failed to send confirmation email to ${registration.email}:`, emailResult.error);
-          }
-        } catch (emailError) {
-          logger.error('Failed to send registration confirmation email:', emailError);
-        }
-
-        try {
-          logger.info(`Sending admin alert for ${registration.email}`);
-          const alertResult = await emailService.sendNewRegistrationAlert(registration);
-          
-          if (alertResult.success) {
-            logger.info(`New registration alert sent successfully to admin for ${registration.email}`);
-          } else {
-            logger.error(`Failed to send admin alert for ${registration.email}:`, alertResult.error);
-          }
-        } catch (emailError) {
-          logger.error('Failed to send new registration alert:', emailError);
+          // Queue admin alert
+          const alertHtml = emailService.getNewRegistrationAlertTemplate(registration);
+          await emailQueue.addEmail(
+            process.env.ADMIN_EMAIL || 'admin@msmeclinic.com',
+            'New Registration Alert - Katsina State National MSME Clinic',
+            alertHtml,
+            null,
+            'normal'
+          );
+          logger.info(`Admin alert queued for ${registration.email}`);
+        } catch (error) {
+          logger.error('Failed to queue admin alert:', error);
         }
       });
 
