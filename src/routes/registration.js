@@ -9,7 +9,7 @@ const timeout = require('../middleware/timeout');
 
 // POST /api/register - Submit registration
 router.post('/', 
-  timeout(10000), // 10 second timeout
+  timeout(5000), // 5 second timeout - force faster responses
   validate(registrationSchema),
   asyncHandler(async (req, res) => {
     const startTime = Date.now();
@@ -19,9 +19,9 @@ router.post('/',
     try {
       logger.info(`Registration request started for email: ${registrationData.email}`);
       
-      // Check if email already exists
+      // Check if email already exists (with index optimization)
       const emailCheckStart = Date.now();
-      const existingRegistration = await Registration.findOne({ email: registrationData.email });
+      const existingRegistration = await Registration.findOne({ email: registrationData.email }).lean();
       const emailCheckTime = Date.now() - emailCheckStart;
       logger.info(`Email check completed in ${emailCheckTime}ms`);
       
