@@ -32,15 +32,17 @@
     "mongoose": "^8.0.3",
     "uuid": "^9.0.1",
     "moment": "^2.29.4",
-    "xlsx": "^0.18.5",
-    "puppeteer": "^21.6.1",
     "winston": "^3.11.0",
     "compression": "^1.7.4",
     "express-mongo-sanitize": "^2.2.0",
     "hpp": "^0.2.3",
     "swagger-ui-express": "^5.0.0",
     "swagger-jsdoc": "^6.2.8",
-    "express-fileupload": "^1.4.3",
+    "express-fileupload": "^1.4.3"
+  },
+  "optionalDependencies": {
+    "xlsx": "^0.18.5",
+    "puppeteer": "^21.6.1",
     "csv-parser": "^3.0.0",
     "pdfkit": "^0.14.0"
   },

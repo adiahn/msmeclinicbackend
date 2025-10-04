@@ -5,7 +5,8 @@
       "src": "api/index.js",
       "use": "@vercel/node",
       "config": {
-        "maxDuration": 30
+        "maxDuration": 30,
+        "includeFiles": ["src/**", "package.json"]
       }
     }
   ],
@@ -17,5 +18,6 @@
   ],
   "env": {
     "NODE_ENV": "production"
-  }
+  },
+  "installCommand": "npm install --production --no-optional"
 }

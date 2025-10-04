@@ -12,3 +12,10 @@ README.md
 Dockerfile
 .dockerignore
 render.yaml
+test
+tests
+__tests__
+*.test.js
+*.spec.js
+coverage
+.nyc_output
