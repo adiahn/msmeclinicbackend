@@ -76,6 +76,17 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Welcome to Katsina State National MSME Clinic API',
+    documentation: '/api/docs',
+    health: '/api/health',
+    version: '1.0.0'
+  });
+});
+
 // API Documentation
 if (process.env.NODE_ENV !== 'production') {
   const swaggerUi = require('swagger-ui-express');
@@ -84,7 +95,7 @@ if (process.env.NODE_ENV !== 'production') {
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     explorer: true,
     customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'MSME Clinic API Documentation'
+    customSiteTitle: 'Katsina State National MSME Clinic API Documentation'
   }));
 }
 
