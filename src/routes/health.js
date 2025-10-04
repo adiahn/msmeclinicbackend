@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const emailService = require('../utils/emailService');
 const logger = require('../utils/logger');
 
 // GET /api/health - Health check endpoint
@@ -29,17 +28,6 @@ router.get('/', async (req, res) => {
       healthCheck.status = 'unhealthy';
     }
 
-    // Check email service
-    try {
-      // Simple check - if transporter is configured
-      if (emailService.transporter) {
-        healthCheck.services.email = 'configured';
-      } else {
-        healthCheck.services.email = 'not_configured';
-      }
-    } catch (error) {
-      healthCheck.services.email = 'error';
-    }
 
     // Check memory usage
     const memoryUsage = process.memoryUsage();
@@ -112,26 +100,6 @@ router.get('/detailed', async (req, res) => {
       detailedHealth.status = 'unhealthy';
     }
 
-    // Email service detailed check
-    try {
-      if (emailService.transporter) {
-        detailedHealth.services.email = {
-          status: 'configured',
-          host: process.env.SMTP_HOST,
-          port: process.env.SMTP_PORT,
-          user: process.env.SMTP_USER ? 'configured' : 'not_configured'
-        };
-      } else {
-        detailedHealth.services.email = {
-          status: 'not_configured'
-        };
-      }
-    } catch (error) {
-      detailedHealth.services.email = {
-        status: 'error',
-        error: error.message
-      };
-    }
 
     // System information
     detailedHealth.system = {
@@ -148,10 +116,7 @@ router.get('/detailed', async (req, res) => {
     const requiredEnvVars = [
       'MONGODB_URI',
       'JWT_SECRET',
-      'JWT_REFRESH_SECRET',
-      'SMTP_HOST',
-      'SMTP_USER',
-      'SMTP_PASS'
+      'JWT_REFRESH_SECRET'
     ];
 
     detailedHealth.environment = {

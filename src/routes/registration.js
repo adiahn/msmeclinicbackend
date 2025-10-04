@@ -3,7 +3,6 @@ const router = express.Router();
 const Registration = require('../database/models/Registration');
 const { registrationSchema, emailConfirmationSchema, validate } = require('../utils/validation');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
-const emailLogger = require('../utils/emailLogger');
 const logger = require('../utils/logger');
 const timeout = require('../middleware/timeout');
 
@@ -51,34 +50,6 @@ router.post('/',
         }
       });
 
-      // Log emails (since SMTP is blocked on Render free tier)
-      setImmediate(async () => {
-        logger.info(`Logging emails for ${registration.email}`);
-        
-        try {
-          // Log confirmation email
-          const confirmationResult = await emailLogger.sendRegistrationConfirmation(registration);
-          if (confirmationResult.success) {
-            logger.info(`Registration confirmation email logged successfully for ${registration.email}`);
-          } else {
-            logger.error(`Failed to log confirmation email for ${registration.email}:`, confirmationResult.error);
-          }
-        } catch (error) {
-          logger.error('Failed to log registration confirmation email:', error);
-        }
-
-        try {
-          // Log admin alert
-          const alertResult = await emailLogger.sendNewRegistrationAlert(registration);
-          if (alertResult.success) {
-            logger.info(`New registration alert logged successfully for ${registration.email}`);
-          } else {
-            logger.error(`Failed to log admin alert for ${registration.email}:`, alertResult.error);
-          }
-        } catch (error) {
-          logger.error('Failed to log new registration alert:', error);
-        }
-      });
 
     } catch (error) {
       // If registration was saved but response failed, we need to handle this
