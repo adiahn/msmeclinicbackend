@@ -5,15 +5,11 @@ const { registrationSchema, emailConfirmationSchema, validate } = require('../ut
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const emailService = require('../utils/emailService');
 const logger = require('../utils/logger');
-const { connectDB } = require('../database/vercelConnection');
 
 // POST /api/register - Submit registration
 router.post('/', 
   validate(registrationSchema),
   asyncHandler(async (req, res) => {
-    // Ensure database connection
-    await connectDB();
-    
     const registrationData = req.body;
 
     // Check if email already exists

@@ -100,48 +100,29 @@ const startServer = async () => {
     // Connect to database
     await connectDB();
     
-    // Only start server if not in Vercel environment
-    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-      app.listen(PORT, () => {
-        logger.info(`Server running on port ${PORT}`);
-        logger.info(`Environment: ${process.env.NODE_ENV}`);
-        logger.info(`API Documentation: http://localhost:${PORT}/api/docs`);
-      });
-    }
+    app.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT}`);
+      logger.info(`Environment: ${process.env.NODE_ENV}`);
+      logger.info(`API Documentation: http://localhost:${PORT}/api/docs`);
+    });
   } catch (error) {
     logger.error('Failed to start server:', error);
-    if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-      process.exit(1);
-    }
+    process.exit(1);
   }
 };
-
-// Initialize database connection for Vercel
-if (process.env.VERCEL) {
-  connectDB().catch(err => {
-    logger.error('Database connection failed in Vercel:', err);
-  });
-}
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   logger.error('Unhandled Promise Rejection:', err);
-  if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-    process.exit(1);
-  }
+  process.exit(1);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught Exception:', err);
-  if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-    process.exit(1);
-  }
+  process.exit(1);
 });
 
-// Only start server if not in Vercel
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  startServer();
-}
+startServer();
 
 module.exports = app;
