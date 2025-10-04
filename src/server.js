@@ -116,6 +116,13 @@ const startServer = async () => {
   }
 };
 
+// Initialize database connection for Vercel
+if (process.env.VERCEL) {
+  connectDB().catch(err => {
+    logger.error('Database connection failed in Vercel:', err);
+  });
+}
+
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   logger.error('Unhandled Promise Rejection:', err);
