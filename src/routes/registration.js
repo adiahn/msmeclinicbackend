@@ -5,51 +5,93 @@ const { registrationSchema, emailConfirmationSchema, validate } = require('../ut
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const emailService = require('../utils/emailService');
 const logger = require('../utils/logger');
+const timeout = require('../middleware/timeout');
 
 // POST /api/register - Submit registration
 router.post('/', 
+  timeout(10000), // 10 second timeout
   validate(registrationSchema),
   asyncHandler(async (req, res) => {
+    const startTime = Date.now();
     const registrationData = req.body;
+    let registration = null;
 
-    // Check if email already exists
-    const existingRegistration = await Registration.findOne({ email: registrationData.email });
-    if (existingRegistration) {
-      throw new AppError('Email already registered', 400, 'DUPLICATE_EMAIL');
-    }
-
-    // Create new registration
-    const registration = new Registration(registrationData);
-    await registration.save();
-
-    // Send confirmation email
     try {
-      await emailService.sendRegistrationConfirmation(registration);
-      logger.info(`Registration confirmation email sent to ${registration.email}`);
-    } catch (emailError) {
-      logger.error('Failed to send registration confirmation email:', emailError);
-      // Don't fail the registration if email fails
-    }
-
-    // Send new registration alert to admin
-    try {
-      await emailService.sendNewRegistrationAlert(registration);
-      logger.info(`New registration alert sent to admin for ${registration.email}`);
-    } catch (emailError) {
-      logger.error('Failed to send new registration alert:', emailError);
-      // Don't fail the registration if email fails
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Registration successful - You are confirmed to attend!',
-      data: {
-        registrationId: registration.registrationId,
-        participantId: registration.participantId,
-        email: registration.email,
-        status: 'confirmed_to_attend'
+      logger.info(`Registration request started for email: ${registrationData.email}`);
+      
+      // Check if email already exists
+      const emailCheckStart = Date.now();
+      const existingRegistration = await Registration.findOne({ email: registrationData.email });
+      const emailCheckTime = Date.now() - emailCheckStart;
+      logger.info(`Email check completed in ${emailCheckTime}ms`);
+      
+      if (existingRegistration) {
+        throw new AppError('Email already registered', 400, 'DUPLICATE_EMAIL');
       }
-    });
+
+      // Create new registration
+      const saveStart = Date.now();
+      registration = new Registration(registrationData);
+      await registration.save();
+      const saveTime = Date.now() - saveStart;
+      logger.info(`Registration saved in ${saveTime}ms`);
+
+      // Send response immediately (don't wait for emails)
+      const totalTime = Date.now() - startTime;
+      logger.info(`Registration completed successfully in ${totalTime}ms for email: ${registrationData.email}`);
+      
+      res.status(201).json({
+        success: true,
+        message: 'Registration successful - You are confirmed to attend!',
+        data: {
+          registrationId: registration.registrationId,
+          participantId: registration.participantId,
+          email: registration.email,
+          status: 'confirmed_to_attend'
+        }
+      });
+
+      // Send emails asynchronously (non-blocking)
+      setImmediate(async () => {
+        try {
+          // Send confirmation email with timeout
+          const emailPromise = emailService.sendRegistrationConfirmation(registration);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Email timeout')), 10000)
+          );
+          
+          await Promise.race([emailPromise, timeoutPromise]);
+          logger.info(`Registration confirmation email sent to ${registration.email}`);
+        } catch (emailError) {
+          logger.error('Failed to send registration confirmation email:', emailError);
+        }
+
+        try {
+          // Send admin alert with timeout
+          const alertPromise = emailService.sendNewRegistrationAlert(registration);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Email timeout')), 10000)
+          );
+          
+          await Promise.race([alertPromise, timeoutPromise]);
+          logger.info(`New registration alert sent to admin for ${registration.email}`);
+        } catch (emailError) {
+          logger.error('Failed to send new registration alert:', emailError);
+        }
+      });
+
+    } catch (error) {
+      // If registration was saved but response failed, we need to handle this
+      if (registration && registration._id) {
+        logger.error('Registration saved but response failed, cleaning up:', error);
+        try {
+          await Registration.findByIdAndDelete(registration._id);
+        } catch (cleanupError) {
+          logger.error('Failed to cleanup registration after error:', cleanupError);
+        }
+      }
+      throw error;
+    }
   })
 );
 

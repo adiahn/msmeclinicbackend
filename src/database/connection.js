@@ -10,8 +10,12 @@ const connectDB = async () => {
     }
 
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+      serverSelectionTimeoutMS: 3000, // Keep trying to send operations for 3 seconds
+      socketTimeoutMS: 10000, // Close sockets after 10 seconds of inactivity
+      connectTimeoutMS: 5000, // Give up initial connection after 5 seconds
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+      minPoolSize: 2, // Maintain a minimum of 2 socket connections
+      maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
     });
 
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
