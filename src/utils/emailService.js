@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
+const cloudEmailService = require('./cloudEmailService');
 
 class EmailService {
   constructor() {
@@ -18,9 +19,10 @@ class EmailService {
       // Use different configuration for production (Render) vs development
       const isProduction = process.env.NODE_ENV === 'production';
       
-      this.transporter = nodemailer.createTransport({
+      // For Render/production, use more aggressive settings
+      const smtpConfig = {
         host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
+        port: parseInt(process.env.SMTP_PORT),
         secure: false, // true for 465, false for other ports
         auth: {
           user: process.env.SMTP_USER,
@@ -28,19 +30,32 @@ class EmailService {
         },
         tls: {
           rejectUnauthorized: false,
-          ciphers: 'SSLv3'
-        },
-        connectionTimeout: isProduction ? 15000 : 10000, // Longer timeout for production
-        greetingTimeout: isProduction ? 10000 : 5000,
-        socketTimeout: isProduction ? 15000 : 10000,
-        pool: isProduction, // Use pooling in production
-        maxConnections: isProduction ? 3 : 1, // Fewer connections in production
-        maxMessages: isProduction ? 50 : 100,
-        rateDelta: isProduction ? 30000 : 20000, // Slower rate in production
-        rateLimit: isProduction ? 3 : 5, // Fewer emails per rateDelta in production
-        debug: !isProduction, // Debug only in development
-        logger: isProduction ? false : true
-      });
+          ciphers: 'SSLv3',
+          secureProtocol: 'TLSv1_method'
+        }
+      };
+
+      if (isProduction) {
+        // Production-specific settings for cloud platforms
+        smtpConfig.connectionTimeout = 30000; // 30 seconds
+        smtpConfig.greetingTimeout = 15000; // 15 seconds
+        smtpConfig.socketTimeout = 30000; // 30 seconds
+        smtpConfig.pool = false; // Disable pooling on cloud platforms
+        smtpConfig.requireTLS = true;
+        smtpConfig.ignoreTLS = false;
+        smtpConfig.debug = false;
+        smtpConfig.logger = false;
+      } else {
+        // Development settings
+        smtpConfig.connectionTimeout = 10000;
+        smtpConfig.greetingTimeout = 5000;
+        smtpConfig.socketTimeout = 10000;
+        smtpConfig.pool = true;
+        smtpConfig.debug = true;
+        smtpConfig.logger = true;
+      }
+      
+      this.transporter = nodemailer.createTransport(smtpConfig);
 
       // Verify connection configuration
       this.transporter.verify((error, success) => {
@@ -58,8 +73,9 @@ class EmailService {
   async sendEmail(to, subject, html, text = null, retries = 3) {
     try {
       if (!this.transporter) {
-        logger.warn('Email service not available - skipping email send');
-        return { success: false, error: 'Email service not configured' };
+        logger.warn('Email service not available - trying cloud email service');
+        // Try cloud email service as fallback
+        return await cloudEmailService.sendEmail(to, subject, html, text);
       }
 
       const mailOptions = {
@@ -83,8 +99,9 @@ class EmailService {
           logger.warn(`Email send attempt ${attempt} failed:`, error.message);
           
           if (attempt === retries) {
-            logger.error('All email send attempts failed:', error);
-            return { success: false, error: error.message };
+            logger.error('All email send attempts failed, trying cloud email service:', error);
+            // Try cloud email service as fallback
+            return await cloudEmailService.sendEmail(to, subject, html, text);
           }
           
           // Wait before retry (exponential backoff)
@@ -94,8 +111,9 @@ class EmailService {
         }
       }
     } catch (error) {
-      logger.error('Failed to send email:', error);
-      return { success: false, error: error.message };
+      logger.error('Failed to send email, trying cloud email service:', error);
+      // Try cloud email service as fallback
+      return await cloudEmailService.sendEmail(to, subject, html, text);
     }
   }
 
