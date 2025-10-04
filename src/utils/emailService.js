@@ -15,6 +15,9 @@ class EmailService {
         return;
       }
 
+      // Use different configuration for production (Render) vs development
+      const isProduction = process.env.NODE_ENV === 'production';
+      
       this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: process.env.SMTP_PORT,
@@ -24,8 +27,19 @@ class EmailService {
           pass: process.env.SMTP_PASS,
         },
         tls: {
-          rejectUnauthorized: false
-        }
+          rejectUnauthorized: false,
+          ciphers: 'SSLv3'
+        },
+        connectionTimeout: isProduction ? 15000 : 10000, // Longer timeout for production
+        greetingTimeout: isProduction ? 10000 : 5000,
+        socketTimeout: isProduction ? 15000 : 10000,
+        pool: isProduction, // Use pooling in production
+        maxConnections: isProduction ? 3 : 1, // Fewer connections in production
+        maxMessages: isProduction ? 50 : 100,
+        rateDelta: isProduction ? 30000 : 20000, // Slower rate in production
+        rateLimit: isProduction ? 3 : 5, // Fewer emails per rateDelta in production
+        debug: !isProduction, // Debug only in development
+        logger: isProduction ? false : true
       });
 
       // Verify connection configuration
@@ -41,7 +55,7 @@ class EmailService {
     }
   }
 
-  async sendEmail(to, subject, html, text = null) {
+  async sendEmail(to, subject, html, text = null, retries = 3) {
     try {
       if (!this.transporter) {
         logger.warn('Email service not available - skipping email send');
@@ -59,9 +73,26 @@ class EmailService {
         text: text || this.stripHtml(html)
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      logger.info(`Email sent successfully to ${to}:`, result.messageId);
-      return { success: true, messageId: result.messageId };
+      // Retry logic for email sending
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const result = await this.transporter.sendMail(mailOptions);
+          logger.info(`Email sent successfully to ${to} (attempt ${attempt}):`, result.messageId);
+          return { success: true, messageId: result.messageId };
+        } catch (error) {
+          logger.warn(`Email send attempt ${attempt} failed:`, error.message);
+          
+          if (attempt === retries) {
+            logger.error('All email send attempts failed:', error);
+            return { success: false, error: error.message };
+          }
+          
+          // Wait before retry (exponential backoff)
+          const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          logger.info(`Retrying email send in ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
     } catch (error) {
       logger.error('Failed to send email:', error);
       return { success: false, error: error.message };
