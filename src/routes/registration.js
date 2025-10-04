@@ -53,28 +53,36 @@ router.post('/',
 
       // Send emails asynchronously (non-blocking)
       setImmediate(async () => {
+        logger.info(`Starting email sending process for ${registration.email}`);
+        
+        // Check if email service is available
+        if (!emailService.transporter) {
+          logger.error('Email service not available - cannot send emails');
+          return;
+        }
+
         try {
-          // Send confirmation email with timeout
-          const emailPromise = emailService.sendRegistrationConfirmation(registration);
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Email timeout')), 10000)
-          );
+          logger.info(`Sending confirmation email to ${registration.email}`);
+          const emailResult = await emailService.sendRegistrationConfirmation(registration);
           
-          await Promise.race([emailPromise, timeoutPromise]);
-          logger.info(`Registration confirmation email sent to ${registration.email}`);
+          if (emailResult.success) {
+            logger.info(`Registration confirmation email sent successfully to ${registration.email}`);
+          } else {
+            logger.error(`Failed to send confirmation email to ${registration.email}:`, emailResult.error);
+          }
         } catch (emailError) {
           logger.error('Failed to send registration confirmation email:', emailError);
         }
 
         try {
-          // Send admin alert with timeout
-          const alertPromise = emailService.sendNewRegistrationAlert(registration);
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Email timeout')), 10000)
-          );
+          logger.info(`Sending admin alert for ${registration.email}`);
+          const alertResult = await emailService.sendNewRegistrationAlert(registration);
           
-          await Promise.race([alertPromise, timeoutPromise]);
-          logger.info(`New registration alert sent to admin for ${registration.email}`);
+          if (alertResult.success) {
+            logger.info(`New registration alert sent successfully to admin for ${registration.email}`);
+          } else {
+            logger.error(`Failed to send admin alert for ${registration.email}:`, alertResult.error);
+          }
         } catch (emailError) {
           logger.error('Failed to send new registration alert:', emailError);
         }

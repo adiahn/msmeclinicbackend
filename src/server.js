@@ -21,6 +21,7 @@ const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/upload');
 const healthRoutes = require('./routes/health');
 const sendConfirmationRoutes = require('./routes/sendConfirmation');
+const testEmailRoutes = require('./routes/testEmail');
 
 const app = express();
 
@@ -94,6 +95,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/send-confirmation', sendConfirmationRoutes);
+app.use('/api/test-email', testEmailRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
