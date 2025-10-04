@@ -5,7 +5,6 @@ const ContactMessage = require('../database/models/ContactMessage');
 const { statusUpdateSchema, queryParamsSchema, validate } = require('../utils/validation');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const { authenticateToken, requireRole } = require('../middleware/auth');
-const emailService = require('../utils/emailService');
 const logger = require('../utils/logger');
 
 // GET /api/admin/registrations - Get all registrations with filters and pagination
@@ -119,14 +118,6 @@ router.patch('/registrations/:id/status',
     registration.status = status;
     await registration.save();
 
-    // Send status update email
-    try {
-      await emailService.sendStatusUpdateNotification(registration, status);
-      logger.info(`Status update email sent to ${registration.email} for status change: ${oldStatus} -> ${status}`);
-    } catch (emailError) {
-      logger.error('Failed to send status update email:', emailError);
-      // Don't fail the status update if email fails
-    }
 
     logger.info(`Registration ${registration.registrationId} status updated from ${oldStatus} to ${status} by admin ${req.admin.email}`);
 

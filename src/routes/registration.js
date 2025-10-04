@@ -66,35 +66,6 @@ router.post('/',
   })
 );
 
-// POST /api/send-confirmation - Send confirmation email
-router.post('/send-confirmation',
-  validate(emailConfirmationSchema),
-  asyncHandler(async (req, res) => {
-    const { email, registrationId } = req.body;
-
-    // Find registration
-    const registration = await Registration.findOne({ 
-      email: email.toLowerCase(), 
-      registrationId 
-    });
-
-    if (!registration) {
-      throw new AppError('Registration not found', 404, 'NOT_FOUND');
-    }
-
-    // Send confirmation email
-    const emailResult = await emailService.sendRegistrationConfirmation(registration);
-    
-    if (!emailResult.success) {
-      throw new AppError('Failed to send confirmation email', 500, 'EMAIL_SEND_FAILED');
-    }
-
-    res.json({
-      success: true,
-      message: 'Confirmation email sent successfully'
-    });
-  })
-);
 
 // GET /api/register/:id - Get single registration (public, for confirmation)
 router.get('/:id',
