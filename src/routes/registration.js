@@ -3,7 +3,7 @@ const router = express.Router();
 const Registration = require('../database/models/Registration');
 const { registrationSchema, emailConfirmationSchema, validate } = require('../utils/validation');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
-const emailService = require('../utils/emailService');
+const emailLogger = require('../utils/emailLogger');
 const logger = require('../utils/logger');
 const timeout = require('../middleware/timeout');
 
@@ -51,32 +51,32 @@ router.post('/',
         }
       });
 
-      // Send emails asynchronously (non-blocking) using simple approach
+      // Log emails (since SMTP is blocked on Render free tier)
       setImmediate(async () => {
-        logger.info(`Sending emails for ${registration.email}`);
+        logger.info(`Logging emails for ${registration.email}`);
         
         try {
-          // Send confirmation email
-          const confirmationResult = await emailService.sendRegistrationConfirmation(registration);
+          // Log confirmation email
+          const confirmationResult = await emailLogger.sendRegistrationConfirmation(registration);
           if (confirmationResult.success) {
-            logger.info(`Registration confirmation email sent successfully to ${registration.email}`);
+            logger.info(`Registration confirmation email logged successfully for ${registration.email}`);
           } else {
-            logger.error(`Failed to send confirmation email to ${registration.email}:`, confirmationResult.error);
+            logger.error(`Failed to log confirmation email for ${registration.email}:`, confirmationResult.error);
           }
         } catch (error) {
-          logger.error('Failed to send registration confirmation email:', error);
+          logger.error('Failed to log registration confirmation email:', error);
         }
 
         try {
-          // Send admin alert
-          const alertResult = await emailService.sendNewRegistrationAlert(registration);
+          // Log admin alert
+          const alertResult = await emailLogger.sendNewRegistrationAlert(registration);
           if (alertResult.success) {
-            logger.info(`New registration alert sent successfully to admin for ${registration.email}`);
+            logger.info(`New registration alert logged successfully for ${registration.email}`);
           } else {
-            logger.error(`Failed to send admin alert for ${registration.email}:`, alertResult.error);
+            logger.error(`Failed to log admin alert for ${registration.email}:`, alertResult.error);
           }
         } catch (error) {
-          logger.error('Failed to send new registration alert:', error);
+          logger.error('Failed to log new registration alert:', error);
         }
       });
 

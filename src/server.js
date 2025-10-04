@@ -22,6 +22,7 @@ const uploadRoutes = require('./routes/upload');
 const healthRoutes = require('./routes/health');
 const sendConfirmationRoutes = require('./routes/sendConfirmation');
 const testEmailRoutes = require('./routes/testEmail');
+const emailLogsRoutes = require('./routes/emailLogs');
 
 const app = express();
 
@@ -96,6 +97,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/send-confirmation', sendConfirmationRoutes);
 app.use('/api/test-email', testEmailRoutes);
+app.use('/api/email-logs', emailLogsRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
