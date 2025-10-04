@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const emailService = require('../utils/simpleEmailService');
+const emailService = require('../utils/emailService');
 const logger = require('../utils/logger');
 
 // GET /api/test-email - Test email service
@@ -8,12 +8,11 @@ router.get('/', async (req, res) => {
   try {
     logger.info('Testing simple email service...');
     
-    // Check if email accounts are configured
-    const emailAccounts = emailService.getEmailAccounts();
-    if (emailAccounts.length === 0) {
+    // Check if email service is configured
+    if (!emailService.transporter) {
       return res.status(500).json({
         success: false,
-        error: 'No email accounts configured - SMTP credentials missing'
+        error: 'Email service not configured - SMTP credentials missing'
       });
     }
 
@@ -39,7 +38,6 @@ router.get('/', async (req, res) => {
         message: 'Email service is working',
         data: {
           messageId: result.messageId,
-          availableAccounts: emailAccounts.length,
           smtpUser: process.env.SMTP_USER ? 'configured' : 'missing',
           fromEmail: process.env.FROM_EMAIL
         }

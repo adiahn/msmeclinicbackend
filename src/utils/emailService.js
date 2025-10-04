@@ -1,7 +1,52 @@
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
-const cloudEmailService = require('./cloudEmailService');
-const renderEmailService = require('./renderEmailService');
+
+// Create Gmail transporter (simple and effective)
+const createGmailTransporter = (user, pass) => {
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: user,
+      pass: pass
+    }
+  });
+};
+
+// Get all available Gmail accounts for fallback
+const getEmailAccounts = () => {
+  const accounts = [];
+  
+  // Primary Gmail account
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    accounts.push({
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+      name: 'Primary Gmail'
+    });
+  }
+  
+  // Backup Gmail account 1 (if configured)
+  if (process.env.SMTP_USER_2 && process.env.SMTP_PASS_2) {
+    accounts.push({
+      user: process.env.SMTP_USER_2,
+      pass: process.env.SMTP_PASS_2,
+      name: 'Backup Gmail 1'
+    });
+  }
+  
+  // Backup Gmail account 2 (if configured)
+  if (process.env.SMTP_USER_3 && process.env.SMTP_PASS_3) {
+    accounts.push({
+      user: process.env.SMTP_USER_3,
+      pass: process.env.SMTP_PASS_3,
+      name: 'Backup Gmail 2'
+    });
+  }
+  
+  return accounts;
+};
 
 class EmailService {
   constructor() {
@@ -17,46 +62,8 @@ class EmailService {
         return;
       }
 
-      // Use different configuration for production (Render) vs development
-      const isProduction = process.env.NODE_ENV === 'production';
-      
-      // For Render/production, use more aggressive settings
-      const smtpConfig = {
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT),
-        secure: false, // true for 465, false for other ports
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-        tls: {
-          rejectUnauthorized: false,
-          ciphers: 'SSLv3',
-          secureProtocol: 'TLSv1_method'
-        }
-      };
-
-      if (isProduction) {
-        // Production-specific settings for cloud platforms
-        smtpConfig.connectionTimeout = 30000; // 30 seconds
-        smtpConfig.greetingTimeout = 15000; // 15 seconds
-        smtpConfig.socketTimeout = 30000; // 30 seconds
-        smtpConfig.pool = false; // Disable pooling on cloud platforms
-        smtpConfig.requireTLS = true;
-        smtpConfig.ignoreTLS = false;
-        smtpConfig.debug = false;
-        smtpConfig.logger = false;
-      } else {
-        // Development settings
-        smtpConfig.connectionTimeout = 10000;
-        smtpConfig.greetingTimeout = 5000;
-        smtpConfig.socketTimeout = 10000;
-        smtpConfig.pool = true;
-        smtpConfig.debug = true;
-        smtpConfig.logger = true;
-      }
-      
-      this.transporter = nodemailer.createTransport(smtpConfig);
+      // Use simple Gmail configuration
+      this.transporter = createGmailTransporter(process.env.SMTP_USER, process.env.SMTP_PASS);
 
       // Verify connection configuration
       this.transporter.verify((error, success) => {
@@ -71,60 +78,47 @@ class EmailService {
     }
   }
 
-  async sendEmail(to, subject, html, text = null, retries = 3) {
-    try {
-      // For production (Render), try render email service first
-      if (process.env.NODE_ENV === 'production') {
-        logger.info('Using render email service for production');
-        const renderResult = await renderEmailService.sendEmail(to, subject, html, text);
-        if (renderResult.success) {
-          return renderResult;
-        }
-        logger.warn('Render email service failed, trying cloud email service');
-        return await cloudEmailService.sendEmail(to, subject, html, text);
-      }
-
-      // For development, use standard email service
-      if (!this.transporter) {
-        logger.warn('Email service not available - trying cloud email service');
-        return await cloudEmailService.sendEmail(to, subject, html, text);
-      }
-
-      const mailOptions = {
-        from: {
-          name: process.env.FROM_NAME || 'Katsina State National MSME Clinic',
-          address: process.env.FROM_EMAIL || process.env.SMTP_USER
-        },
-        to,
-        subject,
-        html,
-        text: text || this.stripHtml(html)
-      };
-
-      // Retry logic for email sending
-      for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-          const result = await this.transporter.sendMail(mailOptions);
-          logger.info(`Email sent successfully to ${to} (attempt ${attempt}):`, result.messageId);
-          return { success: true, messageId: result.messageId };
-        } catch (error) {
-          logger.warn(`Email send attempt ${attempt} failed:`, error.message);
-          
-          if (attempt === retries) {
-            logger.error('All email send attempts failed, trying cloud email service:', error);
-            return await cloudEmailService.sendEmail(to, subject, html, text);
-          }
-          
-          // Wait before retry (exponential backoff)
-          const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-          logger.info(`Retrying email send in ${waitTime}ms...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-      }
-    } catch (error) {
-      logger.error('Failed to send email, trying cloud email service:', error);
-      return await cloudEmailService.sendEmail(to, subject, html, text);
+  async sendEmail(to, subject, html, text = null) {
+    const emailAccounts = getEmailAccounts();
+    
+    if (emailAccounts.length === 0) {
+      logger.error('No email accounts configured');
+      return { success: false, error: 'No email accounts configured' };
     }
+    
+    const mailOptions = {
+      from: `"${process.env.FROM_NAME || 'Katsina State National MSME Clinic'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+      to: to,
+      subject: subject,
+      html: html,
+      text: text || html.replace(/<[^>]*>/g, '') // Strip HTML for text version
+    };
+
+    // Try each Gmail account until one succeeds
+    for (let i = 0; i < emailAccounts.length; i++) {
+      const account = emailAccounts[i];
+      logger.info(`📧 Trying ${account.name} (${account.user})...`);
+      
+      try {
+        const transporter = createGmailTransporter(account.user, account.pass);
+        const result = await transporter.sendMail(mailOptions);
+        logger.info(`✅ Email sent successfully to ${to} using ${account.name}: ${result.messageId}`);
+        return { success: true, messageId: result.messageId };
+      } catch (error) {
+        logger.error(`❌ ${account.name} failed:`, error.message);
+        
+        // If this is the last account, return false
+        if (i === emailAccounts.length - 1) {
+          logger.error('All Gmail accounts failed');
+          return { success: false, error: 'All Gmail accounts failed' };
+        }
+        
+        // Continue to next account
+        logger.info(`🔄 Trying next Gmail account...`);
+      }
+    }
+    
+    return { success: false, error: 'No working email accounts' };
   }
 
   async sendRegistrationConfirmation(registration) {

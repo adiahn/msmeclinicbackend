@@ -3,7 +3,7 @@ const router = express.Router();
 const Registration = require('../database/models/Registration');
 const { registrationSchema, emailConfirmationSchema, validate } = require('../utils/validation');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
-const emailService = require('../utils/simpleEmailService');
+const emailService = require('../utils/emailService');
 const logger = require('../utils/logger');
 const timeout = require('../middleware/timeout');
 
