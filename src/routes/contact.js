@@ -5,11 +5,15 @@ const { contactMessageSchema, validate } = require('../utils/validation');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const emailService = require('../utils/emailService');
 const logger = require('../utils/logger');
+const { connectDB } = require('../database/vercelConnection');
 
 // POST /api/contact - Submit contact form
 router.post('/',
   validate(contactMessageSchema),
   asyncHandler(async (req, res) => {
+    // Ensure database connection
+    await connectDB();
+    
     const contactData = req.body;
 
     // Create new contact message
